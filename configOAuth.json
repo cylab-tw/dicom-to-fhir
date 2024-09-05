@@ -1,0 +1,16 @@
+{
+    "enabled":true,
+    "hostname":"172.18.0.58",
+    "port":"8080",
+    "http":"http",
+    "client_id":"dcm4chee",
+    "client_secret":"v6uYKjl6UDXFhe7ebPBGwOILQ01GYRQg",
+    "endpoints":
+    {
+        "auth":"realms/mitw/protocol/openid-connect/auth",
+        "validation":"realms/mitw/protocol/openid-connect/userinfo", 
+        "token":"realms/mitw/protocol/openid-connect/token" 
+    },
+    "tokenInRequest":true
+}
+
