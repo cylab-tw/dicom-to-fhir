@@ -28,7 +28,7 @@ async function main() {
  * @returns imaging study result
  */
 function fillImagingStudy(imagingStudy, studyData, seriesData, instanceData) {
-    // Check and fill in study instance uid
+    // Check and fill in study instance uid               
     if (studyData[0]['0020000D'] && studyData[0]['0020000D']['Value'] && studyData[0]['0020000D']['Value'][0]) {
         imagingStudy.identifier[0].value = `urn:oid:${studyData[0]['0020000D']['Value'][0]}`;
     }
@@ -68,7 +68,7 @@ function fillImagingStudy(imagingStudy, studyData, seriesData, instanceData) {
         }
     }
 
-    // If no procedure codes were found, add one with empty code and display
+    /*// If no procedure codes were found, add one with empty code and display
     if (imagingStudy.procedureCode.length === 0) {
         imagingStudy.procedureCode.push({
             "coding": [{
@@ -77,7 +77,7 @@ function fillImagingStudy(imagingStudy, studyData, seriesData, instanceData) {
                 "display": ""
             }]
         });
-    }
+    }*/
 
     // Check and fill in additional procedure codes
     if(studyData[0]['00081032'] && studyData[0]['00081032']['Value']) {
