@@ -48,8 +48,8 @@ function fillImagingStudy(imagingStudy, studyData, seriesData, instanceData) {
     imagingStudy.numberOfSeries = seriesData.length;
     
     // Fill in procedure code
-    imagingStudy.procedureCode = [];
     if (studyData[0]['00081032'] && studyData[0]['00081032']['Value']) {
+        imagingStudy.procedureCode = [];
         for (let i = 0; i < studyData[0]['00081032']['Value'].length; i++) {
             let codeItem = studyData[0]['00081032']['Value'][i];
             let code = codeItem['00080015'] ? codeItem['00080015']['Value'][0] : 
