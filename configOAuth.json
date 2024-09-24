@@ -1,5 +1,5 @@
 {
-    "enabled":true,
+    "enabled":false,
     "hostname":"172.18.0.58",
     "port":"8080",
     "http":"http",
