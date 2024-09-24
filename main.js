@@ -48,13 +48,36 @@ function fillImagingStudy(imagingStudy, studyData, seriesData, instanceData) {
     imagingStudy.numberOfSeries = seriesData.length;
     
     // Fill in procedure code
-    imagingStudy.procedureCode = [{
-        "coding" : [{
-          "system" : "https://twcore.mohw.gov.tw/ig/emr/CodeSystem/ICD-10-procedurecode",
-          "code" : "BW24ZZZ",
-          "display" : "Computerized Tomography (CT Scan) of Chest and Abdomen"    
-        }]
-    }];
+    imagingStudy.procedureCode = [];
+    if (studyData[0]['00081032'] && studyData[0]['00081032']['Value']) {
+        for (let i = 0; i < studyData[0]['00081032']['Value'].length; i++) {
+            let codeItem = studyData[0]['00081032']['Value'][i];
+            let code = codeItem['00080015'] ? codeItem['00080015']['Value'][0] : 
+                       (codeItem['00080100'] ? codeItem['00080100']['Value'][0] : null);
+            let display = codeItem['00080104'] ? codeItem['00080104']['Value'][0] : '';
+            
+            if (code) {
+                imagingStudy.procedureCode.push({
+                    "coding": [{
+                        "system": "https://twcore.mohw.gov.tw/ig/emr/CodeSystem/ICD-10-procedurecode",
+                        "code": code,
+                        "display": display
+                    }]
+                });
+            }
+        }
+    }
+
+    // If no procedure codes were found, add one with empty code and display
+    if (imagingStudy.procedureCode.length === 0) {
+        imagingStudy.procedureCode.push({
+            "coding": [{
+                "system": "https://twcore.mohw.gov.tw/ig/emr/CodeSystem/ICD-10-procedurecode",
+                "code": "",
+                "display": ""
+            }]
+        });
+    }
 
     // Check and fill in additional procedure codes
     if(studyData[0]['00081032'] && studyData[0]['00081032']['Value']) {
