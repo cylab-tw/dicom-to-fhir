@@ -28,35 +28,49 @@ async function main() {
  * @returns imaging study result
  */
 function fillImagingStudy(imagingStudy, studyData, seriesData, instanceData) {
-    // Fill in the study instance uid
-    imagingStudy.identifier[0].value = `urn:oid:${studyData[0]['0020000D']['Value'][0]}`;
-    // Fill in the Accession Number
-    imagingStudy.identifier[1].value = `${studyData[0]['00080050']['Value'][0]}`;
-    // Fill in the Number Of Instances
+    // Check and fill in study instance uid
+    if (studyData[0]['0020000D'] && studyData[0]['0020000D']['Value'] && studyData[0]['0020000D']['Value'][0]) {
+        imagingStudy.identifier[0].value = `urn:oid:${studyData[0]['0020000D']['Value'][0]}`;
+    }
+
+    // Check and fill in Accession Number
+    if (studyData[0]['00080050'] && studyData[0]['00080050']['Value'] && studyData[0]['00080050']['Value'][0]) {
+        imagingStudy.identifier[1].value = `${studyData[0]['00080050']['Value'][0]}`;
+    }
+
+    // Fill in Number Of Instances
     imagingStudy.numberOfInstances = 0;
     for(let i = 0; i < Object.keys(instanceData).length; i++){
         imagingStudy.numberOfInstances += instanceData[Object.keys(instanceData)[i]].length;
     }
-    // Fill in the Number Of Series
+
+    // Fill in Number Of Series
     imagingStudy.numberOfSeries = seriesData.length;
     
-    // Fill in the procedure code
+    // Fill in procedure code
     imagingStudy.procedureCode = [{
         "coding" : [{
           "system" : "https://twcore.mohw.gov.tw/ig/emr/CodeSystem/ICD-10-procedurecode",
           "code" : "BW24ZZZ",
           "display" : "Computerized Tomography (CT Scan) of Chest and Abdomen"    
         }]
-      }];
-    if(studyData[0]['00081032'] != undefined){
+    }];
+
+    // Check and fill in additional procedure codes
+    if(studyData[0]['00081032'] && studyData[0]['00081032']['Value']) {
         for(let i = 0; i < studyData[0]['00081032']['Value'].length; i++){
-            let thisCode = [{"coding":[]}];
             let thisCodeData = studyData[0]['00081032']['Value'][i];
-            thisCode["coding"].push({
-                "system": "https://twcore.mohw.gov.tw/ig/emr/CodeSystem/ICD-10-procedurecode",
-                "code": thisCodeData['00080100']['Value'][0],
-                "display": thisCodeData['00080104']['Value'][0]
-            });
+            if (thisCodeData['00080100'] && thisCodeData['00080100']['Value'] && 
+                thisCodeData['00080104'] && thisCodeData['00080104']['Value']) {
+                let thisCode = {
+                    "coding": [{
+                        "system": "https://twcore.mohw.gov.tw/ig/emr/CodeSystem/ICD-10-procedurecode",
+                        "code": thisCodeData['00080100']['Value'][0],
+                        "display": thisCodeData['00080104']['Value'][0]
+                    }]
+                };
+                imagingStudy.procedureCode.push(thisCode);
+            }
         }
     }
 
