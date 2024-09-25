@@ -1,22 +1,135 @@
-async function main() {
+// 全局變量
+let allStudies = [];
+let currentPage = 1;
+let itemsPerPage = 10;
 
-    let imagingStudy = await loadJson("./ImagingStudy-ImagingStudyBase.json"); 
-    console.log(imagingStudy);
-    // 1. Query DICOM by StudyInstanceUID 查詢dicom
-    let studyData = await queryStudy();
-    let seriesData = await querySeries(studyData[0]['0020000D']['Value'][0]);
+async function queryStudies() {
+    const baseUrl = document.getElementById('dicom-url').value;
+    const patientId = document.getElementById('patient-id').value;
+    const studyUid = document.getElementById('study-uid').value;
+    const accessionNumber = document.getElementById('accession-number').value;
+
+    let url = `${baseUrl}/studies?`;
+    if (patientId) url += `PatientID=${patientId}&`;
+    if (studyUid) url += `StudyInstanceUID=${studyUid}&`;
+    if (accessionNumber) url += `AccessionNumber=${accessionNumber}&`;
+
+    try {
+        const response = await fetch(url, {
+            headers: { 'Accept': 'application/json' }
+        });
+        allStudies = await response.json();
+        currentPage = 1;
+        displayStudies();
+    } catch (error) {
+        console.error('Error querying studies:', error);
+    }
+}
+
+function displayStudies() {
+    const studyList = document.getElementById('study-list');
+    studyList.innerHTML = '';
+    
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const pageStudies = allStudies.slice(startIndex, endIndex);
+
+    // 創建表格
+    const table = document.createElement('table');
+    table.className = 'table table-striped table-hover';
+    
+    // 創建表頭
+    const thead = document.createElement('thead');
+    thead.innerHTML = `
+        <tr>
+            <th>Study Date</th>
+            <th>Patient Name</th>
+            <th>Accession Number</th>
+            <th>Patient ID</th>
+            <th style="max-width: 200px;">Study Instance UID</th>
+            <th>操作</th>
+        </tr>
+    `;
+    table.appendChild(thead);
+
+    // 創建表體
+    const tbody = document.createElement('tbody');
+    pageStudies.forEach(study => {
+        const tr = document.createElement('tr');
+        
+        const studyDate = study['00080020'] && study['00080020'].Value ? study['00080020'].Value[0] : 'N/A';
+        const patientName = study['00100010'] && study['00100010'].Value && study['00100010'].Value[0].Alphabetic
+            ? study['00100010'].Value[0].Alphabetic
+            : 'N/A';
+        const accessionNumber = study['00080050'] && study['00080050'].Value ? study['00080050'].Value[0] : 'N/A';
+        const patientID = study['00100020'] && study['00100020'].Value ? study['00100020'].Value[0] : 'N/A';
+        const studyInstanceUID = study['0020000D'] && study['0020000D'].Value ? study['0020000D'].Value[0] : 'N/A';
+        
+        tr.innerHTML = `
+            <td>${studyDate}</td>
+            <td>${patientName}</td>
+            <td>${accessionNumber}</td>
+            <td>${patientID}</td>
+            <td style="max-width: 200px; word-break: break-all;">${studyInstanceUID}</td>
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="processStudy('${studyInstanceUID}')">轉換成FHIR</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+
+    studyList.appendChild(table);
+
+    document.getElementById('current-page').textContent = currentPage;
+    document.getElementById('items-per-page').value = itemsPerPage;
+}
+
+function changePage(delta) {
+    const maxPage = Math.ceil(allStudies.length / itemsPerPage);
+    currentPage += delta;
+    if (currentPage < 1) currentPage = 1;
+    if (currentPage > maxPage) currentPage = maxPage;
+    displayStudies();
+}
+
+function changeItemsPerPage() {
+    itemsPerPage = parseInt(document.getElementById('items-per-page').value);
+    currentPage = 1;
+    displayStudies();
+}
+
+async function processStudy(studyInstanceUid) {
+    // 顯示加載指示器
+    document.getElementById('json-result').innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+
+    let imagingStudy = await loadJson("./ImagingStudy-ImagingStudyBase.json");
+    let studyData = await queryStudy(studyInstanceUid);
+    let seriesData = await querySeries(studyInstanceUid);
     let instanceData = {};
     for(let i = 0; i < seriesData.length; i++) {
-        instanceData[seriesData[i]['0020000E']['Value'][0]] = await queryInstances(studyData[0]['0020000D']['Value'][0], seriesData[i]['0020000E']['Value'][0]);
+        instanceData[seriesData[i]['0020000E']['Value'][0]] = await queryInstances(studyInstanceUid, seriesData[i]['0020000E']['Value'][0]);
     }
-    console.log(studyData);
-    console.log(seriesData);
-    console.log(instanceData);
-    // 2. Fill in the FHIR JSON using the DICOM Query Result 將dicom查詢結果填入fhir ImagingStudy
-    let resultImagingStudy = fillImagingStudy(imagingStudy,studyData,seriesData,instanceData);
-    // 3. Put the FHIR JSON Result in Textarea. 顯示結果
-    console.log(resultImagingStudy);
-    document.getElementById('result').innerText = JSON.stringify(resultImagingStudy);
+    let resultImagingStudy = fillImagingStudy(imagingStudy, studyData, seriesData, instanceData);
+    
+    // 使用 JSONFormatter 顯示結果，並調整配置
+    const formatter = new JSONFormatter(resultImagingStudy, 2, {
+        hoverPreviewEnabled: true,
+        hoverPreviewArrayCount: 100,
+        hoverPreviewFieldCount: 5,
+        theme: '', // 使用自定義主題
+        animateOpen: false,
+        animateClose: false
+    });
+
+    const jsonResultElement = document.getElementById('json-result');
+    jsonResultElement.innerHTML = '';
+    jsonResultElement.appendChild(formatter.render());
+
+    // 設置複製按鈕功能
+    setupCopyButton(resultImagingStudy);
+
+    document.getElementById('fhir-result-tab').click();
 }
 
 /**
@@ -47,53 +160,31 @@ function fillImagingStudy(imagingStudy, studyData, seriesData, instanceData) {
     // Fill in Number Of Series
     imagingStudy.numberOfSeries = seriesData.length;
     
-    // Fill in procedure code
+    // Fill in procedure code only if it exists
     if (studyData[0]['00081032'] && studyData[0]['00081032']['Value']) {
-        imagingStudy.procedureCode = [];
-        for (let i = 0; i < studyData[0]['00081032']['Value'].length; i++) {
-            let codeItem = studyData[0]['00081032']['Value'][i];
-            let code = codeItem['00080015'] ? codeItem['00080015']['Value'][0] : 
-                       (codeItem['00080100'] ? codeItem['00080100']['Value'][0] : null);
+        let procedureCodeSequence = studyData[0]['00081032']['Value'];
+        let procedureCodes = [];
+        
+        for (let i = 0; i < procedureCodeSequence.length; i++) {
+            let codeItem = procedureCodeSequence[i];
+            let code = codeItem['00080100'] ? codeItem['00080100']['Value'][0] : null;
             let display = codeItem['00080104'] ? codeItem['00080104']['Value'][0] : '';
+            let system = codeItem['00080102'] ? codeItem['00080102']['Value'][0] : 'https://twcore.mohw.gov.tw/ig/emr/CodeSystem/ICD-10-procedurecode';
             
             if (code) {
-                imagingStudy.procedureCode.push({
+                procedureCodes.push({
                     "coding": [{
-                        "system": "https://twcore.mohw.gov.tw/ig/emr/CodeSystem/ICD-10-procedurecode",
+                        "system": system,
                         "code": code,
                         "display": display
                     }]
                 });
             }
         }
-    }
-
-    /*// If no procedure codes were found, add one with empty code and display
-    if (imagingStudy.procedureCode.length === 0) {
-        imagingStudy.procedureCode.push({
-            "coding": [{
-                "system": "https://twcore.mohw.gov.tw/ig/emr/CodeSystem/ICD-10-procedurecode",
-                "code": "",
-                "display": ""
-            }]
-        });
-    }*/
-
-    // Check and fill in additional procedure codes
-    if(studyData[0]['00081032'] && studyData[0]['00081032']['Value']) {
-        for(let i = 0; i < studyData[0]['00081032']['Value'].length; i++){
-            let thisCodeData = studyData[0]['00081032']['Value'][i];
-            if (thisCodeData['00080100'] && thisCodeData['00080100']['Value'] && 
-                thisCodeData['00080104'] && thisCodeData['00080104']['Value']) {
-                let thisCode = {
-                    "coding": [{
-                        "system": "https://twcore.mohw.gov.tw/ig/emr/CodeSystem/ICD-10-procedurecode",
-                        "code": thisCodeData['00080100']['Value'][0],
-                        "display": thisCodeData['00080104']['Value'][0]
-                    }]
-                };
-                imagingStudy.procedureCode.push(thisCode);
-            }
+        
+        // Only add procedureCode to imagingStudy if we found valid codes
+        if (procedureCodes.length > 0) {
+            imagingStudy.procedureCode = procedureCodes;
         }
     }
 
@@ -109,10 +200,11 @@ function fillImagingStudy(imagingStudy, studyData, seriesData, instanceData) {
         thisSeries.numberOfInstances = instanceData[thisSeries.uid].length;
         thisSeries.instance = [];
         for(let j = 0; j < instanceData[thisSeries.uid].length; j++){
+            
             thisSeries.bodySite = {
                 "system": "http://snomed.info./sct",
-                "code": "251007", // should be instance's tag 00082218.00080100
-                "display": "Pectoral region" // should be instance's tag 00082218.00080104
+                "code": "251007",
+                "display": "Pectoral region"
             };
 
             let thisInstance = {
@@ -150,72 +242,62 @@ function loadJson(url) {
     });
 }
 
-// Function to query Study by StudyInstanceUID using XMLHttpRequest
-function queryStudy() {
+function queryStudy(studyUID) {
     return new Promise((resolve, reject) => {
-        const studyUID = document.getElementById('study-uid').value;
         const baseUrl = document.getElementById('dicom-url').value;
         const url = `${baseUrl}/studies?StudyInstanceUID=${studyUID}`;
 
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', url, true);
-        xhr.setRequestHeader('Accept', 'application/json');
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState === 4) {
-                if (xhr.status === 200) {
-                    const response = JSON.parse(xhr.responseText);
-                    resolve(response);
-                } else {
-                    reject(`Error querying study: ${xhr.status} ${xhr.statusText}`);
-                }
-            }
-        };
-        xhr.send();
+        fetch(url, {
+            headers: { 'Accept': 'application/json' }
+        })
+        .then(response => response.json())
+        .then(data => resolve(data))
+        .catch(error => reject(`Error querying study: ${error}`));
     });
 }
 
-// Function to query Series by StudyInstanceUID using XMLHttpRequest
 function querySeries(studyUID) {
     return new Promise((resolve, reject) => {
         const baseUrl = document.getElementById('dicom-url').value;
         const url = `${baseUrl}/studies/${studyUID}/series`;
 
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', url, true);
-        xhr.setRequestHeader('Accept', 'application/json');
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState === 4) {
-                if (xhr.status === 200) {
-                    const response = JSON.parse(xhr.responseText);
-                    resolve(response);
-                } else {
-                    reject(`Error querying series: ${xhr.status} ${xhr.statusText}`);
-                }
-            }
-        };
-        xhr.send();
+        fetch(url, {
+            headers: { 'Accept': 'application/json' }
+        })
+        .then(response => response.json())
+        .then(data => resolve(data))
+        .catch(error => reject(`Error querying series: ${error}`));
     });
 }
 
-// Function to query Instances by SeriesInstanceUID using XMLHttpRequest
 function queryInstances(studyUID, seriesUID) {
     return new Promise((resolve, reject) => {
         const baseUrl = document.getElementById('dicom-url').value;
         const url = `${baseUrl}/studies/${studyUID}/series/${seriesUID}/instances`;
 
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', url, true);
-        xhr.setRequestHeader('Accept', 'application/json');
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState === 4) {
-                if (xhr.status === 200) {
-                    const response = JSON.parse(xhr.responseText);
-                    resolve(response);
-                } else {
-                    reject(`Error querying instances: ${xhr.status} ${xhr.statusText}`);
-                }
-            }
-        };
-        xhr.send();
+        fetch(url, {
+            headers: { 'Accept': 'application/json' }
+        })
+        .then(response => response.json())
+        .then(data => resolve(data))
+        .catch(error => reject(`Error querying instances: ${error}`));
+    });
+}
+
+function copyToClipboard(text) {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textArea);
+}
+
+function setupCopyButton(resultImagingStudy) {
+    const copyButton = document.getElementById('copy-result');
+    copyButton.addEventListener('click', () => {
+        const jsonString = JSON.stringify(resultImagingStudy, null, 2);
+        copyToClipboard(jsonString);
+        alert('結果已複製到剪貼板');
     });
 }
