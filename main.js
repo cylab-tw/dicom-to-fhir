@@ -103,33 +103,40 @@ async function processStudy(studyInstanceUid) {
     // 顯示加載指示器
     document.getElementById('json-result').innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>';
 
-    let imagingStudy = await loadJson("./ImagingStudy-ImagingStudyBase.json");
-    let studyData = await queryStudy(studyInstanceUid);
-    let seriesData = await querySeries(studyInstanceUid);
-    let instanceData = {};
-    for(let i = 0; i < seriesData.length; i++) {
-        instanceData[seriesData[i]['0020000E']['Value'][0]] = await queryInstances(studyInstanceUid, seriesData[i]['0020000E']['Value'][0]);
+    try {
+        let imagingStudy = await loadJson("./ImagingStudy-ImagingStudyBase.json");
+        let studyData = await queryStudy(studyInstanceUid);
+        let seriesData = await querySeries(studyInstanceUid);
+        let instanceData = {};
+        for(let i = 0; i < seriesData.length; i++) {
+            instanceData[seriesData[i]['0020000E']['Value'][0]] = await queryInstances(studyInstanceUid, seriesData[i]['0020000E']['Value'][0]);
+        }
+        
+        // 使用 await 來獲取 fillImagingStudy 的結果
+        let resultImagingStudy = await fillImagingStudy(imagingStudy, studyData, seriesData, instanceData);
+        
+        // 使用 JSONFormatter 顯示結果，並調整配置
+        const formatter = new JSONFormatter(resultImagingStudy, 2, {
+            hoverPreviewEnabled: true,
+            hoverPreviewArrayCount: 100,
+            hoverPreviewFieldCount: 5,
+            theme: '', // 使用自定義主題
+            animateOpen: false,
+            animateClose: false
+        });
+
+        const jsonResultElement = document.getElementById('json-result');
+        jsonResultElement.innerHTML = '';
+        jsonResultElement.appendChild(formatter.render());
+
+        // 設置複製按鈕功能
+        setupCopyButton(resultImagingStudy);
+
+        document.getElementById('fhir-result-tab').click();
+    } catch (error) {
+        console.error('處理研究時發生錯誤:', error);
+        document.getElementById('json-result').innerHTML = `<div class="alert alert-danger">處理研究時發生錯誤: ${error.message}</div>`;
     }
-    let resultImagingStudy = fillImagingStudy(imagingStudy, studyData, seriesData, instanceData);
-    
-    // 使用 JSONFormatter 顯示結果，並調整配置
-    const formatter = new JSONFormatter(resultImagingStudy, 2, {
-        hoverPreviewEnabled: true,
-        hoverPreviewArrayCount: 100,
-        hoverPreviewFieldCount: 5,
-        theme: '', // 使用自定義主題
-        animateOpen: false,
-        animateClose: false
-    });
-
-    const jsonResultElement = document.getElementById('json-result');
-    jsonResultElement.innerHTML = '';
-    jsonResultElement.appendChild(formatter.render());
-
-    // 設置複製按鈕功能
-    setupCopyButton(resultImagingStudy);
-
-    document.getElementById('fhir-result-tab').click();
 }
 
 /**
@@ -140,7 +147,7 @@ async function processStudy(studyInstanceUid) {
  * @param {*} instanceData 
  * @returns imaging study result
  */
-function fillImagingStudy(imagingStudy, studyData, seriesData, instanceData) {
+async function fillImagingStudy(imagingStudy, studyData, seriesData, instanceData) {
     // Check and fill in study instance uid               
     if (studyData[0]['0020000D'] && studyData[0]['0020000D']['Value'] && studyData[0]['0020000D']['Value'][0]) {
         imagingStudy.identifier[0].value = `urn:oid:${studyData[0]['0020000D']['Value'][0]}`;
@@ -200,13 +207,28 @@ function fillImagingStudy(imagingStudy, studyData, seriesData, instanceData) {
         thisSeries.numberOfInstances = instanceData[thisSeries.uid].length;
         thisSeries.instance = [];
         for(let j = 0; j < instanceData[thisSeries.uid].length; j++){
-            
-            thisSeries.bodySite = {
-                "system": "http://snomed.info./sct",
-                "code": "251007",
-                "display": "Pectoral region"
-            };
+                    
+            // 1. 從seriesData獲取dicomBodyPart
+            let dicomBodyPart = seriesData[i]['00080015'] && seriesData[i]['00080015']['Value'] 
+                ? seriesData[i]['00080015']['Value'][0] 
+                : null;
 
+            // 2. 載入bodySiteCode.json
+            let bodySiteCode = await loadJson("./bodySiteCode.json");
+
+            // 3. 如果dicomBodyPart為null，使用bodySiteCode中的第一個對象作為預設值
+            // 否則，查找匹配的bodySite，如果沒有找到匹配項，也使用第一個對象
+            let matchedBodySite = dicomBodyPart
+                ? (bodySiteCode.find(site => site.Code === dicomBodyPart) || bodySiteCode[0])
+                : bodySiteCode[0];
+
+            // 4. 設置thisSeries.bodySite
+            thisSeries.bodySite = {
+                "system": matchedBodySite.System,
+                "code": matchedBodySite.Code,
+                "display": matchedBodySite.Display
+            };
+            
             let thisInstance = {
                 "uid": instanceData[thisSeries.uid][j]["00080018"]['Value'][0],
                 "sopClass": {
