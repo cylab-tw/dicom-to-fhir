@@ -2,7 +2,7 @@
   "resourceType" : "ImagingStudy",
   "id" : "ImagingStudyBase",
   "meta" : {
-    "profile" : ["https://twcore.mohw.gov.tw/ig/pas/StructureDefinition/ImagingStudy-twpas"]
+    "profile" :  ["https://twcore.mohw.gov.tw/ig/pas/StructureDefinition/ImagingStudy-twpas"]
   },
   "text" : {
     "status" : "generated",
