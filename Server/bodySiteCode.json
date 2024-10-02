@@ -1,0 +1,87 @@
+[
+    {
+      "Code": "69536005",
+      "System": "http://snomed.info/sct",
+      "Display": "Head"
+    },
+    {
+      "Code": "45048000",
+      "System": "http://snomed.info/sct",
+      "Display": "Neck"
+    },
+    {
+      "Code": "774007",
+      "System": "http://snomed.info/sct",
+      "Display": "Head and neck structure"
+    },
+    {
+      "Code": "43799004",
+      "System": "http://snomed.info/sct",
+      "Display": "Thoracic cavity"
+    },
+    {
+      "Code": "122494005",
+      "System": "http://snomed.info/sct",
+      "Display": "Cervical spine"
+    },
+    {
+      "Code": "122495006",
+      "System": "http://snomed.info/sct",
+      "Display": "Thoracic spine"
+    },
+    {
+      "Code": "122496007",
+      "System": "http://snomed.info/sct",
+      "Display": "Lumbar spine"
+    },
+    {
+      "Code": "416550000",
+      "System": "http://snomed.info/sct",
+      "Display": "Chest and/or abdomen structure (body structure)"
+    },
+    {
+      "Code": "80581009",
+      "System": "http://snomed.info/sct",
+      "Display": "Upper abdomen"
+    },
+    {
+      "Code": "818987002",
+      "System": "http://snomed.info/sct",
+      "Display": "Abdominopelvic cavity"
+    },
+    {
+      "Code": "816991004",
+      "System": "http://snomed.info/sct",
+      "Display": "Structure of cavity of true pelvis (body structure)"
+    },
+    {
+      "Code": "66019005",
+      "System": "http://snomed.info/sct",
+      "Display": "Extremity"
+    },
+    {
+      "Code": "36582005",
+      "System": "http://snomed.info/sct",
+      "Display": "Brachial plexus"
+    },
+    {
+      "Code": "26107004",
+      "System": "http://snomed.info/sct",
+      "Display": "Musculoskeletal system"
+    },
+    {
+      "Code": "113257007",
+      "System": "http://snomed.info/sct",
+      "Display": "Cardiovascular system"
+    },
+    {
+      "Code": "87141009",
+      "System": "http://snomed.info/sct",
+      "Display": "Sacral vertebra"
+    },
+    {
+      "Code": "3058005",
+      "System": "http://snomed.info/sct",
+      "Display": "Peripheral nervous system"
+    }
+  ]

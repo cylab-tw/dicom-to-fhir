@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DICOM Web Query</title>
+    <!-- 引入 Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="./oauth.js"></script>
+    <script src="utils.js"></script>
+    <script src="dicomQueries.js"></script>
+    <script src="fhirConversion.js"></script>
+    <script src="uiHelpers.js"></script>
+    <script src="main.js"></script>
+    <!-- 其他現有的 head 內容 -->
+    <script src="https://cdn.jsdelivr.net/npm/json-formatter-js@2.3.4/dist/json-formatter.umd.min.js"></script>
+    <style>
+        #json-result {
+            max-height: 500px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        .json-formatter-row {
+            margin-left: 20px;
+            border-left: 1px solid #ddd;
+            padding-left: 5px;
+        }
+        .json-formatter-row:hover {
+            background-color: #f0f0f0;
+        }
+        /* 鍵名稱 */
+        .json-formatter-key {
+            color: #881391;
+            font-weight: bold;
+        }
+        /* 字符串值 */
+        .json-formatter-string {
+            color: #268bd2;
+        }
+        /* 數字值 */
+        .json-formatter-number {
+            color: #d33682;
+        }
+        /* 布爾值 */
+        .json-formatter-boolean {
+            color: #b58900;
+        }
+        /* null 值 */
+        .json-formatter-null {
+            color: #6c71c4;
+        }
+        /* 可展開的物件和陣列 */
+        .json-formatter-row .json-formatter-row > a > .json-formatter-bracket {
+            color: #2aa198;
+            font-weight: bold;
+        }
+        /* 展開/收起圖標 */
+        .json-formatter-toggler:after {
+            content: "▶";
+            font-size: 0.8em;
+            margin-right: 6px;
+            color: #586e75;
+        }
+        .json-formatter-toggler.json-formatter-open:after {
+            content: "▼";
+        }
+        /* 為每個層級添加不同的左邊框顏色 */
+        .json-formatter-row .json-formatter-row {
+            border-left-color: #cb4b16;
+        }
+        .json-formatter-row .json-formatter-row .json-formatter-row {
+            border-left-color: #dc322f;
+        }
+        .json-formatter-row .json-formatter-row .json-formatter-row .json-formatter-row {
+            border-left-color: #d33682;
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">DICOM Web Query to FHIR ImagingStudy</h1>
+        <div class="card p-4 shadow-sm">
+            <div class="mb-3">
+                <label for="dicom-url" class="form-label">DICOM Web URL:</label>
+                <input type="text" class="form-control" id="dicom-url" value="https://raccoon.dicom.org.tw/dicom-web">
+            </div>
+            <div class="mb-3">
+                <label for="patient-id" class="form-label">Patient ID:</label>
+                <input type="text" class="form-control" id="patient-id">
+            </div>
+            <div class="mb-3">
+                <label for="study-uid" class="form-label">Study Instance UID:</label>
+                <input type="text" class="form-control" id="study-uid">
+            </div>
+            <div class="mb-3">
+                <label for="accession-number" class="form-label">Accession Number:</label>
+                <input type="text" class="form-control" id="accession-number">
+            </div>
+            <button class="btn btn-primary w-100 mb-3" onclick="queryStudies()">查詢 Studies</button>
+            
+            <div class="mt-4">
+                <ul class="nav nav-tabs" id="resultTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="study-list-tab" data-bs-toggle="tab" data-bs-target="#study-list-content" type="button" role="tab" aria-controls="study-list-content" aria-selected="true">查詢結果</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="fhir-result-tab" data-bs-toggle="tab" data-bs-target="#fhir-result-content" type="button" role="tab" aria-controls="fhir-result-content" aria-selected="false">FHIR ImagingStudy 結果</button>
+                    </li>
+                </ul>
+                <div class="tab-content" id="resultTabsContent">
+                    <div class="tab-pane fade show active" id="study-list-content" role="tabpanel" aria-labelledby="study-list-tab">
+                        <ul id="study-list" class="list-group mt-3"></ul>
+                        <nav aria-label="Page navigation" class="mt-3">
+                            <ul class="pagination justify-content-center">
+                                <li class="page-item">
+                                    <button class="page-link" onclick="changePage(-1)">上一頁</button>
+                                </li>
+                                <li class="page-item">
+                                    <span class="page-link" id="current-page">1</span>
+                                </li>
+                                <li class="page-item">
+                                    <button class="page-link" onclick="changePage(1)">下一頁</button>
+                                </li>
+                            </ul>
+                        </nav>
+                        <div class="mt-3 text-center">
+                            <label for="items-per-page" class="form-label">每頁顯示筆數：</label>
+                            <select class="form-select d-inline-block w-auto" id="items-per-page" onchange="changeItemsPerPage()">
+                                <option value="10">10</option>
+                                <option value="20">20</option>
+                                <option value="50">50</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="fhir-result-content" role="tabpanel" aria-labelledby="fhir-result-tab">
+                        <div class="d-flex justify-content-end mb-2">
+                            <button id="copy-result" class="btn btn-secondary btn-sm">複製結果</button>
+                        </div>
+                        <div id="json-result" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 引入 Bootstrap JS 和 Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+
+    <style>
+        /* 移除了 .json-viewer 相關的樣式  */
+    </style>
+
+</body>
+</html>
